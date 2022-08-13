@@ -1,0 +1,252 @@
+---
+title: "shiny"
+author: "Yuhang Zhou"
+date: "5/16/2022"
+output: html_document
+---
+##two_samples <- c("F_test", "Ansari_Bradley_test", "Moses_rank_like_test", 
+                 ##"Jackknife_test")
+##multisamples <- c("Levene_test", "Bartlett_test", "Hartley_test", 
+                  ##"Cochran_test", "Brown_Forsythe_test", "Variants_of_Levene_test",
+                  ##"Fligner_Killeen_test")
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+
+# Load R packages
+library(shiny)
+library(lawstat) 
+library(sn) 
+library(reshape2) 
+library(nonpar) 
+library(SuppDists) 
+library(GAD)
+library(tidyverse)
+library(car)
+ui <- fluidPage(
+  fluidRow(
+    column(4,
+      selectInput("s", "Numbers of samples to compare",
+                     c("multiple samples" ,
+                       "two samples")),
+           selectInput("d", "Shape of the distribution" ,
+                       c("normal",
+                         "skewed",
+                         "heavy tailed")),
+           selectInput("n", "Sample size of each sample",
+                       c("less than 20",
+                         "20 to 40",
+                         "larger than 40")),
+           textOutput("test_1"),
+           textOutput("test_2"),
+           textOutput("test_3"),
+           textOutput("test_4"),
+           textOutput("test_5"),
+           textOutput("test_6"),
+           textOutput("test_7"),
+           textOutput("test_8"),
+           textOutput("test_9"),
+           textOutput("test_10"),
+           textOutput("test_11"),
+           textOutput("test_12"),
+           textOutput("test_13"),
+           textOutput("test_14"),
+           textOutput("test_15"),
+           textOutput("test_16"),
+          
+  
+),
+column(8,
+fileInput('target_upload', 'Choose file to upload',
+            accept = c(
+              'text/csv',
+              'text/comma-separated-values',
+              '.csv'
+            )),
+  radioButtons("separator","Separator: ",choices = c(";",",",":"), selected=";",inline=TRUE),
+  DT::dataTableOutput("sample_table"),
+tabsetPanel(
+  tabPanel("Two-sample test",
+                 selectInput("q", "Avaliable tests for two-sample",
+                     c("Ftest" ,
+                       "Levene-mean",
+                       "Levene-trim",
+                       "Levene-median",
+                       "Bartlett",
+                       "Ansari-Bradley-unadj",
+                       "Ansari-Bradley-adj",
+                       "Jackknife",
+                       "Fligner-Killeen"))),
+  tabPanel("Three-sample test",
+                            selectInput("r", "Avaliable tests for multi-sample",
+                     c("Levene-mean3",
+                       "Levene-trim3",
+                       "Levene-median3",
+                       "Bartlett3",
+                       "Cochran",
+                       "Fligner-Killeen3")))
+),
+textOutput("F_test"),
+textOutput("Levene_mean"),
+textOutput("Levene_trim"),
+textOutput("Levene_median"),
+textOutput("Bartlett"),
+textOutput("Ansari_Bradley_unadj"),
+textOutput("Ansari_Bradley_adj"),
+textOutput("Jackknife_exact"),
+textOutput("Jackknife_approx"),
+textOutput("Fligner_Killeen"),
+textOutput("Levene_mean3"),
+textOutput("Levene_trim3"),
+textOutput("Levene_median3"),
+textOutput("Bartlett3"),
+textOutput("Cochran"),
+textOutput("Hartley"),
+textOutput("Fligner-Killeen3"),
+  )
+ )
+)
+
+
+server <- function(input, output) {
+    dataframe_products_upload <- reactive({
+    inFile <- input$target_upload
+    if (is.null(inFile))
+      return(NULL)
+    dataframe <- read.csv(inFile$datapath, header = TRUE,sep = input$separator)
+    return(dataframe)
+    
+
+  })
+  
+  output$sample_table<- DT::renderDataTable({
+    dataframe <- dataframe_products_upload()
+    DT::datatable(dataframe)
+  })
+    output$F_test <- renderPrint({
+    if(input$q == "Ftest")
+      var.test(dataframe_products_upload()[,1],dataframe_products_upload()[,2])$p.value
+    })
+    output$Levene_mean <- renderPrint({
+    if(input$q == "Levene-mean")
+      leveneTest(x~gr, data=rbind(data.frame(x=dataframe_products_upload()[,1], gr='gr1'),
+                             data.frame(x=dataframe_products_upload()[,2], gr='gr2')), 
+           center='mean')$`Pr(>F)`
+    })
+    output$Levene_trim <- renderPrint({
+    if(input$q == "Levene-trim")
+            leveneTest(x~gr, data=rbind(data.frame(x=dataframe_products_upload()[,1], gr='gr1'),
+                             data.frame(x=dataframe_products_upload()[,2], gr='gr2')), 
+           center='mean',trim=0.1)$`Pr(>F)`
+    })
+    output$Levene_median <- renderPrint({
+    if(input$q == "Levene-median")
+        leveneTest(x~gr, data=rbind(data.frame(x=dataframe_products_upload()[,1], gr='gr1'),
+                             data.frame(x=dataframe_products_upload()[,2], gr='gr2')), 
+           center='median')$`Pr(>F)`
+    })
+    output$Bartlett <- renderPrint({
+    if(input$q == "Bartlett")
+    bartlett.test(x~gr, data=rbind(data.frame(x=dataframe_products_upload()[,1], gr='gr1'),
+                             data.frame(x=dataframe_products_upload()[,2], gr='gr2')), )$p.value
+    })
+    output$Ansari_Bradley_unadj <- renderPrint({
+    if(input$q == "Ansari-Bradley-unadj")
+    ansari.test(dataframe_products_upload()[,1],dataframe_products_upload()[,2])$p.value
+    })
+    output$Ansari_Bradley_adj <- renderPrint({
+    if(input$q == "Ansari-Bradley-adj")
+    ansari.test(dataframe_products_upload()[,1]-median(dataframe_products_upload()[,1])+median(dataframe_products_upload()[,2]),dataframe_products_upload()[,2])$p.value
+    })
+    output$Jackknife_approx <- renderPrint({
+    if(input$q == "Jackknife")
+    miller.jack(dataframe_products_upload()[,1],dataframe_products_upload()[,2])@PVal
+    })
+    output$Fligner_Killeen <- renderPrint({
+    if(input$q == "Fligner-Killeen")
+    fligner.test(dataframe_products_upload()[,1],dataframe_products_upload()[,2])$p.value
+    })
+    output$Levene_mean3 <- renderPrint({
+    if(input$r == "Levene-mean3")
+    leveneTest(x~gr, data=rbind(data.frame(x=dataframe_products_upload()[,1], gr='gr1'),
+                             data.frame(x=dataframe_products_upload()[,2], gr='gr2'),
+                             data.frame(x=dataframe_products_upload()[,3], gr='gr3')), 
+           center='mean')$`Pr(>F)`
+    })
+    output$Levene_median3 <- renderPrint({
+    if(input$r == "Levene-median3")
+    leveneTest(x~gr, data=rbind(data.frame(x=dataframe_products_upload()[,1], gr='gr1'),
+                             data.frame(x=dataframe_products_upload()[,2], gr='gr2'),
+                             data.frame(x=dataframe_products_upload()[,3], gr='gr3')), 
+           center='median')$`Pr(>F)`
+    })
+    output$Levene_trim3 <- renderPrint({
+    if(input$r == "Levene-trim3")
+    leveneTest(x~gr, data=rbind(data.frame(x=dataframe_products_upload()[,1], gr='gr1'),
+                             data.frame(x=dataframe_products_upload()[,2], gr='gr2'),
+                             data.frame(x=dataframe_products_upload()[,3], gr='gr3')), 
+           center='mean', trim = 0.1)$`Pr(>F)`
+    })
+    output$Bartlett3 <- renderPrint({
+    if(input$r == "Bartlett3")
+    bartlett.test(x~gr, data=rbind(data.frame(x=dataframe_products_upload()[,1], gr='gr1'),
+                             data.frame(x=dataframe_products_upload()[,2], gr='gr2'),
+                             data.frame(x=dataframe_products_upload()[,3], gr='gr3')), )$p.value
+    })
+##   output$Cochran <- renderPrint({
+ ##   if(input$r == "Cochran")
+ ##   C.test(lm() 
+  ##         )
+  ##  })
+    output$Fligner_Killeen3 <- renderPrint({
+    if(input$r == "Fligner-Killeen3")
+    fligner.test(dataframe_products_upload()[,1],dataframe_products_upload()[,2],dataframe_products_upload()[,3])$p.value
+    })
+
+    
+    
+  output$test_1 <- renderText(
+    if (input$s == 'two samples' & input$d == "normal" & input$n == "less than 20") 
+      "F-test, Bartlett test, Jackknife test, Levene test")
+  output$test_2 <- renderText(
+    if (input$s == 'two samples' & input$d == "normal" & input$n == "20 to 40") 
+      "F-test, Bartlett test, Jackknife test, Levene test")
+  output$test_3 <- renderText(
+    if (input$s == 'two samples' & input$d == "normal" & input$n == "larger than 40") 
+      "F-test, Bartlett test, Jackknife test")
+  output$test_4 <- renderText(
+    if (input$s == 'two samples' & input$d == "skewed") 
+      "Ansari Bradley test, Jackknife test, Levene test")
+  output$test_5 <- renderText(
+    if (input$s == 'two samples' & input$d == "heavy tailed") 
+      "Jackknife test")
+  output$test_6 <- renderText(
+    if (input$s == 'multiple samples' & input$d == "normal" & input$n == "less than 20") 
+      "Levene test, Bartlett test, Cochran test")
+  output$test_7 <- renderText(
+    if (input$s == 'multiple samples' & input$d == "normal" & input$n == "20 to 40") 
+      "Levene test, Bartlett test, Cochran test") 
+  output$test_8 <- renderText(
+    if (input$s == 'multiple samples' & input$d == "normal" & input$n == "larger than 40") 
+      "Hartley test, Bartlett test, Cochran test")
+  output$test_9 <- renderText(
+    if (input$s == 'multiple samples' & input$d == "skewed") 
+      "Levene test, Fligner Killeen test")
+  output$test_10 <- renderText(
+    if (input$s == 'multiple samples' & input$d == "heavy tailed" & input$n == "less than 20") 
+      "Levene test")
+  output$test_11 <- renderText(
+    if (input$s == 'multiple samples' & input$d == "heavy tailed" & input$n == "20 to 40") 
+      "Levene test")
+  output$test_12 <- renderText(
+    if (input$s == 'multiple samples' & input$d == "heavy tailed" & input$n == "larger than 40") 
+      "Levene test, Fligner Killeen test")
+
+
+}
+
+
+shinyApp(ui = ui, server = server)
+```
+
